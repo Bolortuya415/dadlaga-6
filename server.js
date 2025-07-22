@@ -3,9 +3,12 @@ const bcrypt = require('bcrypt');
 const db = require('./db');
 const jwt = require('jsonwebtoken');
 const nodemailer = require('nodemailer');
+const swaggerUI = require('swagger-ui-express');
+const swaggerSpec = require('./swagger');
 require('dotenv').config();
 
 const app = express();
+app.use('/api-docs', swaggerUI.serve, swaggerUI.setup(swaggerSpec));
 app.use(express.json());
 
 // Email setup
@@ -23,11 +26,51 @@ function generateCode() {
   return Math.floor(1000 + Math.random() * 9000).toString();
 }
 
+   /**
+    * @swagger
+    * /register:
+    *   post:
+    *     summary: Хэрэглэгч бүртгүүлэх
+    *     responses:
+    *       201:
+    *         description: Хүсэлт амжилттай
+    *         content:
+    *           application/json:
+    *             schema:
+    *               type: object
+    *               properties:
+    *                 error:
+    *                   type: string
+    *                   description: Амжилттай
+    *                   example: Код илгээгдлээ. Email-ээ шалгана уу
+    *       400:
+    *         description: Оруулсан датаг шалгана уу
+    *         content:
+    *           application/json:
+    *             schema:
+    *               type: object
+    *               properties:
+    *                 error:
+    *                   type: string
+    *                   description: Алдааны мэдээлэл
+    *                   example: Энэ email бүртгэлтэй байна
+    *       500:
+    *         description: Системийн админтай холбогдоно уу
+    *         content:
+    *           application/json:
+    *             schema:
+    *               type: object
+    *               properties:
+    *                 error:
+    *                   type: string
+    *                   description: Алдааны мэдээлэл
+    *                   example: Код илгээхэд алдаа гарлаа
+    */
+
 app.post('/register', async (req, res) => {
     const { name, email, password } = req.body;
 
     try {
-        console.log(33333)
         if (await isUserExists(email)) {
             return res.status(400).json({ error: 'Энэ email бүртгэлтэй байна' });
         }
@@ -75,6 +118,46 @@ app.post('/register', async (req, res) => {
     }
 });
 
+/**
+    * @swagger
+    * /login:
+    *   post:
+    *     summary: Хэрэглэгч нэвтрэх
+    *     responses:
+    *       500:
+    *         description: Системийн админтай холбогдоно уу
+    *         content:
+    *           application/json:
+    *             schema:
+    *               type: object
+    *               properties:
+    *                 error:
+    *                   type: string
+    *                   description: Алдааны мэдээлэл
+    *                   example: Серверийн алдаа
+    *       401:
+    *         description: Оруулсан датаг шалгана уу
+    *         content:
+    *           application/json:
+    *             schema:
+    *               type: object
+    *               properties:
+    *                 error:
+    *                   type: string
+    *                   description: Алдааны мэдээлэл
+    *                   example: Нэвтрэх мэдээлэл буруу байна!
+    *       200:
+    *         description: Хүсэлт амжилттай
+    *         content:
+    *           application/json:
+    *             schema:
+    *               type: object
+    *               properties:
+    *                 error:
+    *                   type: string
+    *                   description: Амжилттай
+    *                   example: Амжилттай нэвтэрлээ
+    */
 
 // Login endpoint
 app.post('/login', (req, res) => {
@@ -96,6 +179,58 @@ app.post('/login', (req, res) => {
   });
 });
 
+/**
+    * @swagger
+    * /verify:
+    *   post:
+    *     summary: Хэрэглэгч баталгаажуулах
+    *     responses:
+    *       500:
+    *         description: Системийн админтай холбогдоно уу
+    *         content:
+    *           application/json:
+    *             schema:
+    *               type: object
+    *               properties:
+    *                 error:
+    *                   type: string
+    *                   description: Алдааны мэдээлэл
+    *                   example: Өгөгдлийн сангийн алдаа
+    *       400:
+    *         description: Оруулсан датаг шалгана уу
+    *         content:
+    *           application/json:
+    *             schema:
+    *               type: object
+    *               properties:
+    *                 error:
+    *                   type: string
+    *                   description: Алдааны мэдээлэл
+    *                   example: OTP хугацаа хэтэрсэн. Дахин бүртгүүлнэ үү!
+    *       401:
+    *         description: Оруулсан датаг шалгана уу
+    *         content:
+    *           application/json:
+    *             schema:
+    *               type: object
+    *               properties:
+    *                 error:
+    *                   type: string
+    *                   description: Алдааны мэдээлэл
+    *                   example: Токен олдсонгүй
+    *       403:
+    *         description: Оруулсан датаг шалгана уу
+    *         content:
+    *           application/json:
+    *             schema:
+    *               type: object
+    *               properties:
+    *                 error:
+    *                   type: string
+    *                   description: Алдааны мэдээлэл
+    *                   example: Токен хүчингүй
+    */
+
 // Verify OTP
 app.post('/verify', (req, res) => {
   const { email, code } = req.body;
@@ -107,7 +242,7 @@ app.post('/verify', (req, res) => {
     const elapsedTime = (Date.now() - new Date(otpData.created_at)) / 1000;
     if (elapsedTime > 60) {
       db.query('DELETE FROM otp WHERE email = ?', [email]);
-      return res.status(400).send('OTP хугацаа хэтэрсэн. Дахин бүртгүүлнэ үү.');
+      return res.status(400).send('OTP хугацаа хэтэрсэн. Дахин бүртгүүлнэ үү!');
     }
 
     if (otpData.code !== code) {
@@ -151,6 +286,37 @@ function isAdmin(req, res, next) {
   });
 }
 
+/**
+    * @swagger
+    * /products:
+    *   post:
+    *     summary: Бараа нэмэх 
+    *     responses:
+    *       500:
+    *         description: Системийн админтай холбогдоно уу
+    *         content:
+    *           application/json:
+    *             schema:
+    *               type: object
+    *               properties:
+    *                 error:
+    *                   type: string
+    *                   description: Алдааны мэдээлэл
+    *                   example: Бараа нэмэхэд алдаа гарлаа
+    *       201:
+    *         description: Хүсэлт амжилттай
+    *         content: 
+    *           application/json:
+    *             schema:
+    *               type: object
+    *               properties:
+    *                 error:
+    *                   type: string
+    *                   description: Амжилттай
+    *                   example: Бараа амжилттай нэмэгдлээ
+    *                 
+    */
+
 // Products endpoints
 // Зөвхөн админ бараа нэмэх эрхтэй
 app.post('/products', verifyToken, isAdmin, (req, res) => {
@@ -164,6 +330,36 @@ app.post('/products', verifyToken, isAdmin, (req, res) => {
     }
   );
 });
+
+/**
+ * @swagger
+ * /products/{id}:
+ *   delete:
+ *     summary: Бараа устгах
+ *     responses:
+ *       500:
+ *         description: Системийн админтай холбогдоно уу
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error: 
+ *                   type: string
+ *                   description: Алдааны мэдээлэл
+ *                   example: Бараа устгахад алдаа гарлаа
+ *       404:  
+ *         description: Оруулсан датаг шалгана уу
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error: 
+ *                   type: string
+ *                   description: Алдааны мэдээлэл
+ *                   example: Ийм ID-тай бараа олдсонгүй
+*/
 
 // Зөвхөн админ бараа устгах эрхтэй
 app.delete('/products/:id', verifyToken, isAdmin, (req, res) => {
@@ -179,25 +375,92 @@ app.delete('/products/:id', verifyToken, isAdmin, (req, res) => {
     res.send('Бараа амжилттай устгагдлаа');
   });
 });
-
-app.post('/products', (req, res) => {
-  const { name, description, price, image_url, stock } = req.body;
-  db.query(
-    'INSERT INTO products (name, description, price, image_url, stock_quantity) VALUES (?, ?, ?, ?, ?)',
-    [name, description, price, image_url, stock],
-    (err, result) => {
-      if (err) return res.status(500).send('Бараа нэмэхэд алдаа гарлаа');
-      res.status(201).send('Бараа амжилттай нэмэгдлээ');
-    }
-  );
-});
-
+// Products endpoints
+/**
+    * @swagger
+    * /products:
+    *   get:
+    *     summary: Барааны жагсаалт
+    *     responses:
+    *       500:
+    *         description: Системийн админтай холбогдоно уу
+    *         content:
+    *           application/json:
+    *             schema:
+    *               type: object
+    *               properties:
+    *                 error:
+    *                   type: string
+    *                   description: Алдааны мэдээлэл
+    *                   example: Бараа уншихад алдаа гарлаа
+    *       200:
+    *         description: Хүсэлт амжилттай
+    *         content:
+    *           application/json:
+    *             schema:
+    *               type: object
+    *               properties:
+    *                 title:
+    *                   type: string
+    *                   description: Амжилттай
+    *                   example: Барааны жагсаалт
+    *                 id: 
+    *                   type: integer
+    *                   example: 1
+    *                 name:
+    *                   type: string
+    *                   example: Toy Car
+    *                 description:
+    *                   type: string
+    *                   example: Kids remote toy car
+    *                 image_url:
+    *                   type: string
+    *                   format: uri
+    *                   example: https://example.com/image.jpg
+    *                 price:
+    *                   type: number
+    *                   format: float
+    *                   example: 25.5
+    *                 stock_quantity:
+    *                   type: integer
+    *                   example: 10
+    */
 app.get('/products', (req, res) => {
   db.query('SELECT * FROM products', (err, results) => {
     if (err) return res.status(500).send('Бараа уншихад алдаа гарлаа');
     res.json(results);
   });
 });
+
+/**
+    * @swagger
+    * /cart:
+    *   post:
+    *     summary: Хэрэглэгч бүртгүүлэх
+    *     responses:
+    *       500:
+    *         description: Системийн админтай холбогдоно уу
+    *         content:
+    *           application/json:
+    *             schema:
+    *               type: object
+    *               properties:
+    *                 error:
+    *                   type: string
+    *                   description: Алдааны мэдээлэл
+    *                   example: Сагсанд нэмэхэд алдаа гарлаа
+    *       201:
+    *         description: Хүсэлт амжилттай
+    *         content:
+    *           application/json:
+    *             schema:
+    *               type: object
+    *               properties:
+    *                 error:
+    *                   type: string
+    *                   description: Амжилттай
+    *                   example: Сагсанд нэмэгдлээ
+    */
 
 // Cart endpoints
 app.post('/cart', verifyToken, (req, res) => {
@@ -213,6 +476,25 @@ app.post('/cart', verifyToken, (req, res) => {
   );
 });
 
+/**
+    * @swagger
+    * /cart user:
+    *   get:
+    *     summary: Сагсан дахь бараа харах
+    *     responses:
+    *       500:
+    *         description: Системийн админтай холбогдоно уу
+    *         content:
+    *           application/json:
+    *             schema:
+    *               type: object
+    *               properties:
+    *                 error:
+    *                   type: string
+    *                   description: Алдааны мэдээлэл
+    *                   example: Сагсны мэдээлэл авахад алдаа гарлаа
+    */
+
 app.get('/cart', verifyToken, (req, res) => {
   const userId = req.user.id;
   db.query(
@@ -224,6 +506,36 @@ app.get('/cart', verifyToken, (req, res) => {
     }
   );
 });
+
+/**
+    * @swagger
+    * /orders:
+    *   post:
+    *     summary: захиалга үүсгэх
+    *     responses:
+    *       500:
+    *         description: Системийн админтай холбогдоно уу
+    *         content:
+    *           application/json:
+    *             schema:
+    *               type: object
+    *               properties:
+    *                 error:
+    *                   type: string
+    *                   description: Алдааны мэдээлэл
+    *                   example: Захиалга үүсгэхэд алдаа гарлаа
+    *       201:
+    *         description: Хүсэлт амжилттай
+    *         content:
+    *           application/json:
+    *             schema:
+    *               type: object
+    *               properties:
+    *                 error:
+    *                   type: string
+    *                   description: Амжилттай
+    *                   example: Захиалга амжилттай үүслээ
+    */
 
 // Orders endpoint
 app.post('/orders', (req, res) => {
@@ -275,7 +587,6 @@ const isUserExists = (email) => {
                     resolve(false)
                 }
             }
-        console.log(22222)
             resolve(false);
         });
     });
